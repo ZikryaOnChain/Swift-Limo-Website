@@ -18,9 +18,34 @@ app.use(express.json());
 const SPREADSHEET_ID = process.env.VITE_GOOGLE_SPREADSHEET_ID;
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.VITE_GOOGLE_SERVICE_ACCOUNT_EMAIL;
 
+// Function to properly format the private key
+function formatPrivateKey(key) {
+  if (!key) return undefined;
+  
+  // Remove any existing quotes at the start and end
+  key = key.trim().replace(/^['"]|['"]$/g, '');
+  
+  // Ensure the key has the correct header and footer
+  if (!key.includes('-----BEGIN PRIVATE KEY-----')) {
+    key = '-----BEGIN PRIVATE KEY-----\n' + key;
+  }
+  if (!key.includes('-----END PRIVATE KEY-----')) {
+    key = key + '\n-----END PRIVATE KEY-----';
+  }
+  
+  // Replace all variants of newline placeholders with actual newlines
+  key = key
+    .replace(/\\n/g, '\n')
+    .replace(/\s+-----/g, '\n-----')
+    .split('\\\\n').join('\n')
+    .split('/n').join('\n')
+    .split('\n\n').join('\n');
+
+  return key;
+}
+
 // Handle the private key properly
-const GOOGLE_PRIVATE_KEY = process.env.VITE_GOOGLE_PRIVATE_KEY ? 
-  process.env.VITE_GOOGLE_PRIVATE_KEY.split(String.raw`\n`).join('\n') : undefined;
+const GOOGLE_PRIVATE_KEY = formatPrivateKey(process.env.VITE_GOOGLE_PRIVATE_KEY);
 
 app.post('/api/submit-form', async (req, res) => {
   console.log('Received form submission request');
@@ -38,13 +63,14 @@ app.post('/api/submit-form', async (req, res) => {
       });
     }
 
-    // Log the first and last few characters of the private key for debugging
-    console.log('Private key format check:', {
-      start: GOOGLE_PRIVATE_KEY.substring(0, 30),
-      end: GOOGLE_PRIVATE_KEY.substring(GOOGLE_PRIVATE_KEY.length - 30),
+    // Log the private key format for debugging (safely)
+    const keyPreview = {
+      startsWithHeader: GOOGLE_PRIVATE_KEY.startsWith('-----BEGIN PRIVATE KEY-----'),
+      endsWithFooter: GOOGLE_PRIVATE_KEY.endsWith('-----END PRIVATE KEY-----'),
       length: GOOGLE_PRIVATE_KEY.length,
-      containsHeaders: GOOGLE_PRIVATE_KEY.includes('BEGIN PRIVATE KEY') && GOOGLE_PRIVATE_KEY.includes('END PRIVATE KEY')
-    });
+      numberOfLines: GOOGLE_PRIVATE_KEY.split('\n').length,
+    };
+    console.log('Private key format check:', keyPreview);
 
     // Validate request body
     const requiredFields = ['name', 'email', 'phone', 'date', 'time', 'pickup', 'dropoff', 'vehicle'];
@@ -64,6 +90,15 @@ app.post('/api/submit-form', async (req, res) => {
       key: GOOGLE_PRIVATE_KEY,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
+
+    // Test the JWT auth first
+    try {
+      await auth.authorize();
+      console.log('JWT authorization successful');
+    } catch (authError) {
+      console.error('JWT authorization failed:', authError);
+      throw new Error('Failed to authorize with Google: ' + authError.message);
+    }
 
     const doc = new GoogleSpreadsheet(SPREADSHEET_ID, auth);
 
@@ -118,6 +153,11 @@ app.listen(PORT, () => {
   console.log('Environment variables status:', {
     hasSpreadsheetId: !!SPREADSHEET_ID,
     hasServiceEmail: !!GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    hasPrivateKey: !!GOOGLE_PRIVATE_KEY
+    hasPrivateKey: !!GOOGLE_PRIVATE_KEY,
+    privateKeyFormat: GOOGLE_PRIVATE_KEY ? {
+      length: GOOGLE_PRIVATE_KEY.length,
+      hasCorrectHeader: GOOGLE_PRIVATE_KEY.includes('-----BEGIN PRIVATE KEY-----'),
+      hasCorrectFooter: GOOGLE_PRIVATE_KEY.includes('-----END PRIVATE KEY-----'),
+    } : null
   });
 });
