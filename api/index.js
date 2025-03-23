@@ -17,8 +17,10 @@ app.use(express.json());
 
 const SPREADSHEET_ID = process.env.VITE_GOOGLE_SPREADSHEET_ID;
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.VITE_GOOGLE_SERVICE_ACCOUNT_EMAIL;
+
+// Handle the private key properly
 const GOOGLE_PRIVATE_KEY = process.env.VITE_GOOGLE_PRIVATE_KEY ? 
-  process.env.VITE_GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined;
+  process.env.VITE_GOOGLE_PRIVATE_KEY.split(String.raw`\n`).join('\n') : undefined;
 
 app.post('/api/submit-form', async (req, res) => {
   console.log('Received form submission request');
@@ -36,6 +38,14 @@ app.post('/api/submit-form', async (req, res) => {
       });
     }
 
+    // Log the first and last few characters of the private key for debugging
+    console.log('Private key format check:', {
+      start: GOOGLE_PRIVATE_KEY.substring(0, 30),
+      end: GOOGLE_PRIVATE_KEY.substring(GOOGLE_PRIVATE_KEY.length - 30),
+      length: GOOGLE_PRIVATE_KEY.length,
+      containsHeaders: GOOGLE_PRIVATE_KEY.includes('BEGIN PRIVATE KEY') && GOOGLE_PRIVATE_KEY.includes('END PRIVATE KEY')
+    });
+
     // Validate request body
     const requiredFields = ['name', 'email', 'phone', 'date', 'time', 'pickup', 'dropoff', 'vehicle'];
     const missingFields = requiredFields.filter(field => !req.body[field]);
@@ -49,11 +59,13 @@ app.post('/api/submit-form', async (req, res) => {
     }
 
     console.log('Initializing Google Spreadsheet');
-    const doc = new GoogleSpreadsheet(SPREADSHEET_ID, new JWT({
+    const auth = new JWT({
       email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: GOOGLE_PRIVATE_KEY,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    }));
+    });
+
+    const doc = new GoogleSpreadsheet(SPREADSHEET_ID, auth);
 
     console.log('Loading spreadsheet info');
     await doc.loadInfo();
