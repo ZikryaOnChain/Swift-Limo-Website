@@ -13,8 +13,16 @@ const SPREADSHEET_ID = process.env.VITE_GOOGLE_SPREADSHEET_ID;
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.VITE_GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_PRIVATE_KEY = process.env.VITE_GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
 
-app.post('/submit-form', async (req, res) => {
+app.post('/api/submit-form', async (req, res) => {
   try {
+    if (!SPREADSHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+      console.error('Missing required environment variables');
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Server configuration error' 
+      });
+    }
+
     const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
 
     await doc.useServiceAccountAuth({
@@ -45,7 +53,11 @@ app.post('/submit-form', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
