@@ -49,19 +49,11 @@ app.post('/api/submit-form', async (req, res) => {
     }
 
     console.log('Initializing Google Spreadsheet');
-    const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
-
-    // Create JWT client
-    const serviceAccountAuth = new JWT({
+    const doc = new GoogleSpreadsheet(SPREADSHEET_ID, new JWT({
       email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: GOOGLE_PRIVATE_KEY,
-      scopes: [
-        'https://www.googleapis.com/auth/spreadsheets',
-      ],
-    });
-
-    console.log('Authenticating with Google');
-    await doc.useServiceAccountAuth(serviceAccountAuth);
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    }));
 
     console.log('Loading spreadsheet info');
     await doc.loadInfo();
