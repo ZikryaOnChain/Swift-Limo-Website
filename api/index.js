@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -50,11 +51,17 @@ app.post('/api/submit-form', async (req, res) => {
     console.log('Initializing Google Spreadsheet');
     const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
 
-    console.log('Authenticating with Google');
-    await doc.useServiceAccountAuth({
-      client_email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: GOOGLE_PRIVATE_KEY,
+    // Create JWT client
+    const serviceAccountAuth = new JWT({
+      email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: GOOGLE_PRIVATE_KEY,
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+      ],
     });
+
+    console.log('Authenticating with Google');
+    await doc.useServiceAccountAuth(serviceAccountAuth);
 
     console.log('Loading spreadsheet info');
     await doc.loadInfo();
