@@ -14,6 +14,8 @@ interface FormData {
 
 export async function submitToGoogleSheets(formData: FormData) {
   try {
+    console.log('Submitting form data:', formData);
+    
     const response = await fetch('/api/submit-form', {
       method: 'POST',
       headers: {
@@ -25,14 +27,20 @@ export async function submitToGoogleSheets(formData: FormData) {
       }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      throw new Error('Network response was not ok');
+      console.error('Server error response:', data);
+      throw new Error(data.error || 'Server error occurred');
     }
 
-    const data = await response.json();
+    console.log('Form submission successful:', data);
     return { success: true, data };
   } catch (error) {
     console.error('Error submitting form:', error);
-    return { success: false, error };
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'An unknown error occurred' 
+    };
   }
 }
